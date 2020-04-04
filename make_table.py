@@ -5,38 +5,49 @@ import csv
 import ast
 import math
 import sys
-
+import pandas as pd
 from os import listdir
 
-def read_searches(file, id_to_pubs, all_unique_pubs):
+def read_searches(file, id_to_pubs, unique_publications):
     '''
     This function recieves a searches_by_year file and two dictionaries to which it adds identifiers taken from the searches_by_year file.
     '''
     path = 'searches_by_year/'+str(file)
     print(path)
-    f = open(path, 'r')
-    lines = f.readlines()
+    # f = open(path, 'r')
+    # lines = f.readlines()
 
-    for line in lines:
-        if line == lines[0]: #skip header
-            pass
-        else:
-            line = line.strip().split(',')
-            publication = line[0].strip('\"')
-            url = line[1]
+    # with open(path) as file:
+    #     for line in file:
+    #         line = line.strip().split('\t')
+    #         chebi_id = line[0]
+    #         pub_id = line[1]
+    #         try:
+    #             id_to_pubs[chebi_id].add(pub_id) # check if id is already in dictionary, add to set of publications
+    #         except:
+    #             id_to_pubs[chebi_id] = {pub_id}
+    #
+    #         all_unique_pubs.add(pub_id) # seperate set for all unique publications (with our without ids)
 
-            if url == '': # publication with no id
-                pass
-            else: # publications with ids
-                id = url.split("_")[1].strip('\"')
-                try:
-                    id_to_pubs[id].add(publication) # check if id is already in dictionary, add to set of publications
-                except:
-                    id_to_pubs[id] = {publication}
+    df = pd.read_csv(path, header=None, names=['chemicals', 'publications'], delimiter='\t', dtype={'chemicals': 'object', 'publications': 'object'})
 
-            all_unique_pubs.add(publication) # seperate set for all unique publications (with our without ids)
+    # Update unique publications
+    unique_publications.update(df['publications'].unique())
 
-    return id_to_pubs, all_unique_pubs
+    # # Test unique for both columns
+    # df = df.drop_duplicates(['chemicals', 'publications'])
+
+    for x, y in zip(df['chemicals'], df['publications']):
+        id_to_pubs = add_to_dict(x, y, id_to_pubs)
+
+    return id_to_pubs, unique_publications
+
+def add_to_dict(x, y, id_to_pubs):
+    try:
+        id_to_pubs[x].add(y)
+    except:
+        id_to_pubs[x] = {y}
+    return id_to_pubs
 
 def make_table(data, id_to_tfidf, id_to_counts):
     '''
@@ -75,8 +86,13 @@ def write_table(table, term): # header?
         # writer.writerow(header)
         for id in table.keys():
             row = [id]
-            for col in table[id].keys(): # col juiste naam?
-                row.append(table[id][col])
+            for col in table[id].keys():
+                value = table[id][col]
+                if isinstance(value, list):
+                    for element in value:
+                        row.append(element)
+                else:
+                    row.append(value)
             writer.writerow(row)
 
 def read_input(file):
@@ -103,6 +119,7 @@ def read_input(file):
             id_to_counts[id] = 1
     uniques = len(id_to_counts.keys())
     print('Input file contains %d unique ChEBI IDs' % uniques)
+    f.close()
     return id_to_counts, id_to_publications, term
 
 def read_file(file, key, data):
@@ -174,11 +191,14 @@ def main():
     # get unique publications for all publications since 2005 (?)
     print('reading files for normalization...')
     searches_by_year = listdir('searches_by_year')
-    all_ids_to_publication = dict()
-    all_publications = set()
+    searches_by_year.reverse()
+    # all_ids_to_publication = dict()
+    unique_publications = set()
+    id_to_pubs = dict()
     for file in searches_by_year:
-        if '.csv' in file:
-            all_ids_to_publication, all_publications = read_searches(file, all_ids_to_publication, all_publications)
+        if '.tsv' in file:
+            id_to_pubs, unique_publications = read_searches(file, id_to_pubs, unique_publications)
+
 
     # normalization
     print('perform normalization...')
