@@ -8,7 +8,7 @@ import sys
 import pandas as pd
 from os import listdir
 
-def read_searches(file, id_to_pubs, unique_publications):
+def read_searches_by_year(file, id_to_pubs, unique_publications):
     '''
     This function recieves a searches_by_year file and two dictionaries to which it adds identifiers taken from the searches_by_year file.
     '''
@@ -31,16 +31,19 @@ def read_searches(file, id_to_pubs, unique_publications):
 
     df = pd.read_csv(path, header=None, names=['chemicals', 'publications'], delimiter='\t', dtype={'chemicals': 'object', 'publications': 'object'})
 
-    # Update unique publications
-    unique_publications.update(df['publications'].unique())
+    # # Update unique publications
+    # unique_publications.update(df['publications'].unique())
+    #
+    # # # Test unique for both columns
+    # # df = df.drop_duplicates(['chemicals', 'publications'])
+    #
+    # for x, y in zip(df['chemicals'], df['publications']):
+    #     id_to_pubs = add_to_dict(x, y, id_to_pubs)
 
-    # # Test unique for both columns
-    # df = df.drop_duplicates(['chemicals', 'publications'])
+    id_to_pubs[file] = df
 
-    for x, y in zip(df['chemicals'], df['publications']):
-        id_to_pubs = add_to_dict(x, y, id_to_pubs)
-
-    return id_to_pubs, unique_publications
+    return id_to_pubs
+    # return
 
 def add_to_dict(x, y, id_to_pubs):
     try:
@@ -181,7 +184,7 @@ def main():
     else:
         sys.exit('Error: please give \'file\' or \'folder\' as input type')
 
-    # get the counts and unique publications for allt he chebi id's, plus the search term
+    # get the counts and unique publications for all the chebi id's, plus the search term
     term_to_result = dict()
     for result in results:
         id_to_counts, id_to_publications, term = read_input(result)
@@ -197,31 +200,32 @@ def main():
     id_to_pubs = dict()
     for file in searches_by_year:
         if '.tsv' in file:
-            id_to_pubs, unique_publications = read_searches(file, id_to_pubs, unique_publications)
+            id_to_pubs = read_searches_by_year(file, id_to_pubs, unique_publications)
+            # id_to_pubs, unique_publications = read_searches_by_year(file, id_to_pubs, unique_publications)
 
 
-    # normalization
-    print('perform normalization...')
-    for term in term_to_result.keys():
-        id_to_counts = term_to_result[term]['counts']
-        id_to_tfidf = normalization(id_to_counts, all_ids_to_publication, all_publications)
-        term_to_result[term]['tfidf'] = id_to_tfidf
-
-    # get properties for the chebi ids from the chebi files
-    print('reading files with properties...')
-    files = ['files/ChEBI2Names.tsv', 'files/ChEBI2Mass.tsv', 'files/ChEBI2logP.tsv', 'files/ChEBI2Superterms.tsv']
-    data = dict()
-    for file in files:
-        key = file.split('2')[1].split('.')[0]
-        data = read_file(file, key, data)
-
-    # make table with chebi ids found in the search (all chebi ids in id_to_counts) plus their normalized counts (id_to_tfidf) and all properties (data)
-    print('making the table...')
-    for term in term_to_result.keys():
-        id_to_tfidf = term_to_result[term]['tfidf']
-        id_to_counts = term_to_result[term]['counts']
-        table = make_table(data, id_to_tfidf, id_to_counts)
-        write_table(table, term)
+    # # normalization
+    # print('perform normalization...')
+    # for term in term_to_result.keys():
+    #     id_to_counts = term_to_result[term]['counts']
+    #     id_to_tfidf = normalization(id_to_counts, all_ids_to_publication, all_publications)
+    #     term_to_result[term]['tfidf'] = id_to_tfidf
+    #
+    # # get properties for the chebi ids from the chebi files
+    # print('reading files with properties...')
+    # files = ['files/ChEBI2Names.tsv', 'files/ChEBI2Mass.tsv', 'files/ChEBI2logP.tsv', 'files/ChEBI2Superterms.tsv']
+    # data = dict()
+    # for file in files:
+    #     key = file.split('2')[1].split('.')[0]
+    #     data = read_file(file, key, data)
+    #
+    # # make table with chebi ids found in the search (all chebi ids in id_to_counts) plus their normalized counts (id_to_tfidf) and all properties (data)
+    # print('making the table...')
+    # for term in term_to_result.keys():
+    #     id_to_tfidf = term_to_result[term]['tfidf']
+    #     id_to_counts = term_to_result[term]['counts']
+    #     table = make_table(data, id_to_tfidf, id_to_counts)
+    #     write_table(table, term)
 
 if __name__ == '__main__':
     main()
