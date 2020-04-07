@@ -8,7 +8,7 @@ import sys
 import pandas as pd
 from os import listdir
 
-def read_searches_by_year(file, id_to_pubs, unique_publications):
+def read_searches_by_year(file, set_of_publications, id_to_pubs):
     '''
     This function recieves a searches_by_year file and two dictionaries to which it adds identifiers taken from the searches_by_year file.
     '''
@@ -30,19 +30,14 @@ def read_searches_by_year(file, id_to_pubs, unique_publications):
     #         all_unique_pubs.add(pub_id) # seperate set for all unique publications (with our without ids)
 
     df = pd.read_csv(path, header=None, names=['chemicals', 'publications'], delimiter='\t', dtype={'chemicals': 'object', 'publications': 'object'})
-
-    # # Update unique publications
-    # unique_publications.update(df['publications'].unique())
-    #
-    # # # Test unique for both columns
-    # # df = df.drop_duplicates(['chemicals', 'publications'])
-    #
-    # for x, y in zip(df['chemicals'], df['publications']):
-    #     id_to_pubs = add_to_dict(x, y, id_to_pubs)
+    df.drop_duplicates(['chemicals', 'publications'])
+    set_of_publications.update(df['publications'])
+    df = df.groupby('chemicals')['publications'].apply(list).reset_index(name='pubs')
 
     id_to_pubs[file] = df
+    # id_to_pubs[file] = df
 
-    return id_to_pubs
+    return id_to_pubs, set_of_publications
     # return
 
 def add_to_dict(x, y, id_to_pubs):
@@ -195,13 +190,18 @@ def main():
     print('reading files for normalization...')
     searches_by_year = listdir('searches_by_year')
     searches_by_year.reverse()
-    # all_ids_to_publication = dict()
-    unique_publications = set()
+
     id_to_pubs = dict()
+    set_of_publications = set()
     for file in searches_by_year:
         if '.tsv' in file:
-            id_to_pubs = read_searches_by_year(file, id_to_pubs, unique_publications)
+            id_to_pubs, set_of_publications = read_searches_by_year(file, set_of_publications, id_to_pubs)
             # id_to_pubs, unique_publications = read_searches_by_year(file, id_to_pubs, unique_publications)
+
+    N = len(set_of_publications)
+    print(N)
+    # id_to_pubs_listed = dict()
+    # for df in id_to_pubs.values():
 
 
     # # normalization
