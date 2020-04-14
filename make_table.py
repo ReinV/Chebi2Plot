@@ -8,7 +8,7 @@ import sys
 import pandas as pd
 from os import listdir
 
-def read_searches_by_year(file, set_of_publications, id_to_pubs):
+def read_searches_by_year(file, set_of_publications, file_to_df):
     '''
     This function recieves a searches_by_year file and two dictionaries to which it adds identifiers taken from the searches_by_year file.
     '''
@@ -32,12 +32,14 @@ def read_searches_by_year(file, set_of_publications, id_to_pubs):
     df = pd.read_csv(path, header=None, names=['chemicals', 'publications'], delimiter='\t', dtype={'chemicals': 'object', 'publications': 'object'})
     df.drop_duplicates(['chemicals', 'publications'])
     set_of_publications.update(df['publications'])
-    df = df.groupby('chemicals')['publications'].apply(list).reset_index(name='pubs')
+    df = df.groupby('chemicals')['publications'].apply(tuple).reset_index(name='pubs')
 
-    id_to_pubs[file] = df
+    # print(df.head())
+
+    file_to_df[file] = df
     # id_to_pubs[file] = df
 
-    return id_to_pubs, set_of_publications
+    return file_to_df, set_of_publications
     # return
 
 def add_to_dict(x, y, id_to_pubs):
@@ -157,6 +159,13 @@ def normalization(id_to_counts, id_to_pubs, all_unique_pubs):
 
     return id_to_tfidf
 
+def combine_tuples(zip_element):
+    new_tuple = ()
+    for element in zip_element:
+        if isinstance(element, tuple):
+            new_tuple += element
+    return new_tuple
+
 def parser():
     parser = argparse.ArgumentParser(description='This script makes a table of the query IDs, their names and their properties')
     parser.add_argument('-i', required=True, metavar='input', dest='input', help='[i] to select input folder or input file from the results folder ')
@@ -191,18 +200,48 @@ def main():
     searches_by_year = listdir('searches_by_year')
     searches_by_year.reverse()
 
-    id_to_pubs = dict()
+    file_to_df = dict()
     set_of_publications = set()
     for file in searches_by_year:
         if '.tsv' in file:
-            id_to_pubs, set_of_publications = read_searches_by_year(file, set_of_publications, id_to_pubs)
+            file_to_df, set_of_publications = read_searches_by_year(file, set_of_publications, file_to_df)
             # id_to_pubs, unique_publications = read_searches_by_year(file, id_to_pubs, unique_publications)
 
     N = len(set_of_publications)
     print(N)
-    # id_to_pubs_listed = dict()
-    # for df in id_to_pubs.values():
 
+    df_all = pd.DataFrame(columns=['chemicals', 'pubs'])
+    id_to_pubs = dict()
+    for file in file_to_df.keys():
+        print("adding %s to dict" % file)
+        df = file_to_df[file]
+        df_all = pd.merge(df_all, df, on='chemicals', how='outer')
+        df_all['pubs'] = [combine_tuples(i) for i in zip(df_all.pubs_x, df_all.pubs_y)]
+        df_all = df_all.drop(['pubs_x', 'pubs_y'], axis=1)
+
+    #
+    df_all['sets'] = [set(i) for i in df_all.pubs]
+    df_all['counts'] = [len(i) for i in df_all.sets]
+    id_to_counts = dict(zip(df_all.chemicals, df_all.pubs))
+    all_publications = set()
+    for i in df_all['pubs']: all_publications.update(i)
+    print(len(all_publications))
+    print(len(all_publications.union(set_of_publications)))
+
+    # print('final', df_all.head())
+    # df_all = df_all.groupby('chemicals')['pubs'].apply(set).reset_index(name='pubs')
+    # # df_all['count'] = [len(i) for i in df_all['pubs']]
+    # print(df_all.head())
+        # # CLEAR MEMORY
+        # file_to_df[file] = ''
+        # # CONTINUE TASK
+        # df_all = df_all.drop(['pubs_x', 'pubs_y'], axis=1)
+        # df_all['pubs'] = df_all['pubs'].apply(lambda x: list(set(x)))
+    #
+    # print(len(df_all))
+    # print(df_all.head())
+
+# --------------------------------------------------------------------------
 
     # # normalization
     # print('perform normalization...')
